@@ -1,0 +1,24 @@
+name: Run Main NWLST Scraper
+on:
+  schedule:
+    - cron: '0 4 * * 1'  # Monday 4AM
+  workflow_dispatch:
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install Tools
+      run: |
+        pip install playwright pandas gspread google-auth
+        playwright install chromium
+    - name: Run Scraper
+      env:
+        GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
+      run: python main-nwlst.py
+    - name: Success
+      if: success()
+      run: echo "Data in sheet!"
