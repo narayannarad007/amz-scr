@@ -24,31 +24,22 @@ def scrape_url(url, xpaths):
         'premium_proxy': 'true',
         'country_code': 'in',
         'wait': '8000',
-        'block_resources': 'true, image, font'  # Faster, less data
+        'block_resources': 'true,image,font'  # Faster, less detection
     }
     try:
         r = requests.get('https://app.scrapingbee.com/api/v1/', params=params, timeout=120)
-        print(f"Status code: {r.status_code}")  # Log status
+        print(f"Status code: {r.status_code}")
         if r.status_code == 200:
-            try:
-                tree = html.fromstring(r.content)  # Use content for bytes
-                data = []
-                for xpath in xpaths:
-                    try:
-                        if "/@" in xpath:
-                            part1, attr = xpath.split("/@")
-                            vals = tree.xpath(part1)
-                            value = vals[0].get(attr) if vals else ERRORS["NO_DATA"]
-                        else:
-                            vals = tree.xpath(xpath)
-                            value = " ".join([v.text_content().strip() for v in vals if v.text_content() and v.text_content().strip()])
-                        data.append(value or ERRORS["NO_DATA"])
-                    except:
-                        data.append(ERRORS["XPATH_NOT_FOUND"])
-                return data
-            except Exception as parse_e:
-                print(f"Parsing error: {parse_e}")
-                return [ERRORS["NOT_REACHABLE"]] * len(xpaths)
+            tree = html.fromstring(r.content)
+            data = []
+            for xpath in xpaths:
+                try:
+                    vals = tree.xpath(xpath)
+                    value = " ".join([v.text_content().strip() for v in vals if v.text_content() and v.text_content().strip()])
+                    data.append(value or ERRORS["NO_DATA"])
+                except:
+                    data.append(ERRORS["XPATH_NOT_FOUND"])
+            return data
         else:
             print(f"API error {r.status_code}: {r.text[:300]}")
             return [ERRORS["NOT_REACHABLE"]] * len(xpaths)
@@ -56,17 +47,24 @@ def scrape_url(url, xpaths):
         print(f"Request failed: {e}")
         return [ERRORS["NOT_REACHABLE"]] * len(xpaths)
 
-# Rest same as before (connect_to_sheet, main loop with append_row always)
+def connect_to_sheet():
+    key = json.loads(os.getenv("GOOGLE_CREDS"))
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    creds = Credentials.from_service_account_info(key, scopes=scope)
+    client = gspread.authorize(creds)
+    return client.open("output-m1-amz-nwlst-general").sheet1
 
 if __name__ == "__main__":
-    print("Starting...")
+    print("Starting scraper...")
     df = pd.read_csv("input-m1-amz-nwlst-general.csv")
     urls = df["Current URL"].dropna().tolist()
+    print(f"Found {len(urls)} URLs")
     xpaths = df.iloc[1, 1:].dropna().tolist()
+    print(f"Found {len(xpaths)} XPaths")
     sheet = connect_to_sheet()
     for i, url in enumerate(urls):
         data = scrape_url(url, xpaths)
         sheet.append_row([url] + data)
         print(f"Processed {i+1}/{len(urls)}")
-        time.sleep(1)  # Slower for stability
-    print("Done!")
+        time.sleep(1)  # Delay for stability
+    print("All finished! Check your Google Sheet.")
