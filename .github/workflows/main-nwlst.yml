@@ -1,18 +1,22 @@
 name: Run Scraper
 on:
   schedule:
-    - cron: '0 4 * * 1'
-  workflow_dispatch:
+    - cron: '0 4 * * 1'  # Every Monday at 4AM UTC (adjust as needed)
+  workflow_dispatch:  # Manual run button
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-    - run: pip install requests lxml pandas gspread google-auth
-    - run: python main-nwlst.py
-      env:
-        GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
-        SCRAPINGBEE_KEY: ${{ secrets.SCRAPINGBEE_KEY }}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Dependencies
+        run: |
+          pip install requests lxml pandas gspread google-auth
+      - name: Run Scraper
+        env:
+          GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
+          SCRAPINGBEE_KEY: ${{ secrets.SCRAPINGBEE_KEY }}
+        run: python main-nwlst.py
