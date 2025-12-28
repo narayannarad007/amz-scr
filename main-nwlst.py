@@ -7,7 +7,7 @@ import os
 from lxml import html
 import time
 
-SCRAPINGBEE_KEY = os.getenv("SCRAPINGBEE_KEY")  # Your API key secret
+SCRAPINGBEE_KEY = os.getenv("ZAHII03MJJKNAMPMVKW2H6ER87XV99OYQ2T4GVSRJYQQEC62EIXZNANGAWOCXZSL2JDSXHHLQIJ2VBKR")  # Your API key secret
 
 ERRORS = {
     "NOT_REACHABLE": "Either URL is incorrect or it is not reachable",
