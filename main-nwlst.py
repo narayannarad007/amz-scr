@@ -24,7 +24,7 @@ def scrape_url(url, xpaths):
         'premium_proxy': 'true',
         'country_code': 'in',
         'wait': '8000',
-        'block_resources': 'true,image,font'  # Faster, less detection
+        'block_resources': 'true,image,font'
     }
     try:
         r = requests.get('https://app.scrapingbee.com/api/v1/', params=params, timeout=120)
@@ -47,6 +47,7 @@ def scrape_url(url, xpaths):
         print(f"Request failed: {e}")
         return [ERRORS["NOT_REACHABLE"]] * len(xpaths)
 
+# THIS FUNCTION WAS MISSING — NOW INCLUDED
 def connect_to_sheet():
     key = json.loads(os.getenv("GOOGLE_CREDS"))
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -66,5 +67,5 @@ if __name__ == "__main__":
         data = scrape_url(url, xpaths)
         sheet.append_row([url] + data)
         print(f"Processed {i+1}/{len(urls)}")
-        time.sleep(1)  # Delay for stability
+        time.sleep(1)
     print("All finished! Check your Google Sheet.")
