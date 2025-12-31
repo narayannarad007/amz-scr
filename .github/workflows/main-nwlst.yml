@@ -1,25 +1,35 @@
 name: Run Scraper
+
 on:
   schedule:
-    - cron: '0 4 * * *'  # Daily at 4 AM UTC
-  workflow_dispatch:
+    - cron: '0 4 * * *'  # Runs daily at 4 AM UTC (change time if needed)
+  workflow_dispatch:     # Allows manual run from GitHub UI
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install Dependencies
+
+      - name: Install dependencies
         run: |
-          pip install playwright pandas gspread google-auth playwright-stealth
+          pip install playwright pandas gspread google-auth
           playwright install chromium --with-deps
-      - name: Run Scraper
+
+      - name: Run scraper
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
           IPROYAL_USER: ${{ secrets.IPROYAL_USER }}
           IPROYAL_PASS: ${{ secrets.IPROYAL_PASS }}
           IPROYAL_PORT: ${{ secrets.IPROYAL_PORT }}
         run: python main-nwlst.py
+
+      - name: Completion message
+        if: always()
+        run: echo "Scraper job finished!"
