@@ -4,20 +4,19 @@ import os
 import random
 import pandas as pd
 from playwright.async_api import async_playwright
-from playwright_stealth import stealth_sync  # Correct import (sync version)
+from playwright_stealth import stealth_async  # Correct import for async
 import gspread
 from google.oauth2.service_account import Credentials
-from lxml import html  # Not needed for text extraction, but safe to keep
 import time
 
 # IPRoyal proxy settings from secrets
 IPROYAL_USER = os.getenv("IPROYAL_USER")
 IPROYAL_PASS = os.getenv("IPROYAL_PASS")
-IPROYAL_PORT = os.getenv("IPROYAL_PORT", "10000")  # Default port
+IPROYAL_PORT = os.getenv("IPROYAL_PORT", "10000")
 
 PROXY_SERVER = f"http://{IPROYAL_USER}:{IPROYAL_PASS}@gate.iproyal.com:{IPROYAL_PORT}"
 
-NUM_AT_ONCE = 20  # Parallel pages (adjust based on success)
+NUM_AT_ONCE = 20
 WAIT_TIME = 1.5
 
 ERRORS = {
@@ -99,7 +98,7 @@ async def do_the_scraping(urls, xpaths, sheet):
             group = urls[start:start + NUM_AT_ONCE]
             contexts = [await browser.new_context(user_agent=random.choice(FAKE_BROWSERS)) for _ in group]
             for ctx in contexts:
-                await stealth_sync(ctx)  # Apply stealth
+                await stealth_async(ctx)  # Apply stealth (correct call)
             pages = [await ctx.new_page() for ctx in contexts]
             jobs = [scrape_one_url(pages[i], group[i], xpaths) for i in range(len(group))]
             results = await asyncio.gather(*jobs)
