@@ -4,12 +4,22 @@ import os
 import random
 import pandas as pd
 from playwright.async_api import async_playwright
-from playwright_stealth import stealth_async  # Anti-detection
+from playwright_stealth import stealth_sync  # Correct import (sync version)
 import gspread
 from google.oauth2.service_account import Credentials
+from lxml import html  # Not needed for text extraction, but safe to keep
+import time
 
-NUM_AT_ONCE = 20  # Parallel workers
+# IPRoyal proxy settings from secrets
+IPROYAL_USER = os.getenv("IPROYAL_USER")
+IPROYAL_PASS = os.getenv("IPROYAL_PASS")
+IPROYAL_PORT = os.getenv("IPROYAL_PORT", "10000")  # Default port
+
+PROXY_SERVER = f"http://{IPROYAL_USER}:{IPROYAL_PASS}@gate.iproyal.com:{IPROYAL_PORT}"
+
+NUM_AT_ONCE = 20  # Parallel pages (adjust based on success)
 WAIT_TIME = 1.5
+
 ERRORS = {
     "NOT_REACHABLE": "Either URL is incorrect or it is not reachable",
     "XPATH_NOT_FOUND": "Could not reach to this location",
@@ -18,23 +28,19 @@ ERRORS = {
 
 FAKE_BROWSERS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
 ]
-
-# IPRoyal proxy config
-IPROYAL_USER = os.getenv("IPROYAL_USER")
-IPROYAL_PASS = os.getenv("IPROYAL_PASS")
-IPROYAL_PORT = int(os.getenv("IPROYAL_PORT", "10000"))
-PROXY_SERVER = f"http://{IPROYAL_USER}:{IPROYAL_PASS}@iproyal.com:{IPROYAL_PORT}"
 
 async def get_stuff_from_page(page, xpaths):
     results = []
     for idx, xpath in enumerate(xpaths):
         try:
+            print(f"  Trying XPath {idx+1}: {xpath[:70]}...")
             if "/@" in xpath:
-                part1, part2 = xpath.split("/@")
+                part1, attr = xpath.split("/@")
                 elem = await page.wait_for_selector(part1, timeout=20000)
-                value = await elem.get_attribute(part2) if elem else ERRORS["NO_DATA"]
+                value = await elem.get_attribute(attr) if elem else ERRORS["NO_DATA"]
             else:
                 elem = await page.wait_for_selector(xpath, timeout=20000, state="visible")
                 if elem:
@@ -47,7 +53,9 @@ async def get_stuff_from_page(page, xpaths):
                         value = html.strip()
                 else:
                     value = ERRORS["XPATH_NOT_FOUND"]
-            results.append(value.strip() if value else ERRORS["NO_DATA"])
+            final = value.strip() if value else ERRORS["NO_DATA"]
+            results.append(final)
+            print(f"  Got: {final[:60] if final else 'Empty'}")
         except Exception as e:
             print(f"  XPath {idx+1} error: {e}")
             results.append(ERRORS["XPATH_NOT_FOUND"])
@@ -55,8 +63,11 @@ async def get_stuff_from_page(page, xpaths):
 
 async def scrape_one_url(page, url, xpaths):
     try:
+        print(f"[INFO] Loading: {url}")
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await page.wait_for_load_state("networkidle", timeout=30000)
+        
+        # Full scroll to load lazy content
         await page.evaluate("""async () => {
             await new Promise(resolve => {
                 let totalHeight = 0;
@@ -73,10 +84,11 @@ async def scrape_one_url(page, url, xpaths):
             });
         }""")
         await asyncio.sleep(5)
+        
         data = await get_stuff_from_page(page, xpaths)
         return {"url": url, "data": data, "ok": True}
     except Exception as e:
-        print(f"URL failed: {url} | {e}")
+        print(f"[ERROR] URL failed: {url} | {e}")
         return {"url": url, "data": [ERRORS["NOT_REACHABLE"]] * len(xpaths), "ok": False}
 
 async def do_the_scraping(urls, xpaths, sheet):
@@ -87,7 +99,7 @@ async def do_the_scraping(urls, xpaths, sheet):
             group = urls[start:start + NUM_AT_ONCE]
             contexts = [await browser.new_context(user_agent=random.choice(FAKE_BROWSERS)) for _ in group]
             for ctx in contexts:
-                await stealth_async(ctx)
+                await stealth_sync(ctx)  # Apply stealth
             pages = [await ctx.new_page() for ctx in contexts]
             jobs = [scrape_one_url(pages[i], group[i], xpaths) for i in range(len(group))]
             results = await asyncio.gather(*jobs)
@@ -99,7 +111,7 @@ async def do_the_scraping(urls, xpaths, sheet):
             for ctx in contexts:
                 await ctx.close()
             await asyncio.sleep(WAIT_TIME * NUM_AT_ONCE)
-            print(f"Batch: {start + len(group)} / {len(urls)}")
+            print(f"Batch done: {start + len(group)} / {len(urls)}")
         await browser.close()
     return done
 
@@ -111,10 +123,12 @@ def connect_to_sheet():
     return client.open("output-m1-amz-nwlst-general").sheet1
 
 if __name__ == "__main__":
-    print("Starting...")
+    print("Starting scraper...")
     df = pd.read_csv("input-m1-amz-nwlst-general.csv")
     urls = df["Current URL"].dropna().tolist()
+    print(f"Found {len(urls)} URLs")
     xpaths = df.iloc[1, 1:].dropna().tolist()
+    print(f"Found {len(xpaths)} XPaths")
     sheet = connect_to_sheet()
-    asyncio.run(do_the_scraping(urls, xpaths, sheet))
-    print("Done!")
+    total_done = asyncio.run(do_the_scraping(urls, xpaths, sheet))
+    print(f"Finished! Processed {len(urls)} URLs.")
