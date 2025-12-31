@@ -1,9 +1,8 @@
 name: Run Scraper
 on:
   schedule:
-    - cron: '0 4 * * 1'  # Every Monday at 4AM UTC (adjust as needed)
-  workflow_dispatch:  # Manual run button
-
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -14,9 +13,12 @@ jobs:
           python-version: '3.12'
       - name: Install Dependencies
         run: |
-          pip install requests lxml pandas gspread google-auth
+          pip install playwright pandas gspread google-auth playwright-stealth
+          playwright install chromium
       - name: Run Scraper
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
-          SCRAPINGBEE_KEY: ${{ secrets.SCRAPINGBEE_KEY }}
+          IPROYAL_USER: ${{ secrets.IPROYAL_USER }}
+          IPROYAL_PASS: ${{ secrets.IPROYAL_PASS }}
+          IPROYAL_PORT: 10000
         run: python main-nwlst.py
