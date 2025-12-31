@@ -12,10 +12,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install Dependencies
-        run: |
-          pip install playwright pandas gspread google-auth playwright-stealth
-          playwright install chromium --with-deps
+- name: Install Dependencies
+  run: |
+    pip install playwright pandas gspread google-auth
+    playwright install chromium --with-deps
       - name: Run Scraper
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
