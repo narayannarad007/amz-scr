@@ -4,7 +4,7 @@ import os
 import random
 import pandas as pd
 from playwright.async_api import async_playwright
-from playwright_stealth import stealth  # Correct import in 2025
+from playwright_stealth import stealth  # Correct import
 import gspread
 from google.oauth2.service_account import Credentials
 import time
@@ -16,7 +16,7 @@ IPROYAL_PORT = os.getenv("IPROYAL_PORT", "10000")
 
 PROXY_SERVER = f"http://{IPROYAL_USER}:{IPROYAL_PASS}@gate.iproyal.com:{IPROYAL_PORT}"
 
-NUM_AT_ONCE = 20  # Parallel workers (20 is safe; can increase to 50 if proxies allow)
+NUM_AT_ONCE = 20  # Parallel workers
 WAIT_TIME = 1.5
 
 ERRORS = {
@@ -66,7 +66,7 @@ async def scrape_one_url(page, url, xpaths):
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await page.wait_for_load_state("networkidle", timeout=30000)
         
-        # Full scroll to load lazy content
+        # Full scroll
         await page.evaluate("""async () => {
             await new Promise(resolve => {
                 let totalHeight = 0;
@@ -97,9 +97,11 @@ async def do_the_scraping(urls, xpaths, sheet):
         for start in range(0, len(urls), NUM_AT_ONCE):
             group = urls[start:start + NUM_AT_ONCE]
             contexts = [await browser.new_context(user_agent=random.choice(FAKE_BROWSERS)) for _ in group]
+            pages = []
             for ctx in contexts:
-                await stealth(ctx)  # Apply stealth (correct call)
-            pages = [await ctx.new_page() for ctx in contexts]
+                page = await ctx.new_page()
+                stealth(page)  # Apply stealth to page
+                pages.append(page)
             jobs = [scrape_one_url(pages[i], group[i], xpaths) for i in range(len(group))]
             results = await asyncio.gather(*jobs)
             for result in results:
